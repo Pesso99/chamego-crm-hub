@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Logo } from '@/components/brand/Logo';
 import { toast } from 'sonner';
 
 export default function Login() {
@@ -35,13 +36,21 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-serif">
-            Chamego <span className="text-sm text-muted-foreground">CRM</span>
-          </CardTitle>
-          <CardDescription>Entre para acessar o painel administrativo</CardDescription>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-background via-muted/20 to-chamego-rosa/10 p-4">
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-1/2 -right-1/2 w-full h-full bg-chamego-rosa/5 rounded-full blur-3xl animate-float" />
+        <div className="absolute -bottom-1/2 -left-1/2 w-full h-full bg-chamego-dourado/5 rounded-full blur-3xl animate-float animation-delay-500" />
+      </div>
+
+      <Card className="w-full max-w-md relative animate-scale-in shadow-lg">
+        <CardHeader className="text-center space-y-4">
+          <div className="flex justify-center">
+            <Logo size="lg" />
+          </div>
+          <div>
+            <CardTitle className="text-2xl font-serif">Bem-vindo de volta</CardTitle>
+            <CardDescription>Entre para acessar o painel administrativo</CardDescription>
+          </div>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
@@ -54,6 +63,7 @@ export default function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                className="transition-all focus:ring-2 focus:ring-chamego-dourado/20"
               />
             </div>
             <div className="space-y-2">
@@ -64,9 +74,14 @@ export default function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                className="transition-all focus:ring-2 focus:ring-chamego-dourado/20"
               />
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-chamego-dourado to-chamego-dourado/80 hover:shadow-lg transition-all" 
+              disabled={loading}
+            >
               {loading ? 'Entrando...' : 'Entrar'}
             </Button>
           </form>

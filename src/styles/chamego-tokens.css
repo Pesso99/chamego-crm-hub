@@ -18,6 +18,14 @@
   --admin-accent-subtle: 5 100% 93%; /* rosa sutil */
   --admin-accent-gold: 30 75% 37%; /* dourado */
   
+  /* Gradients */
+  --gradient-brand: linear-gradient(135deg, hsl(var(--chamego-rosa-bebe)), hsl(var(--chamego-dourado) / 0.3));
+  --gradient-subtle: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted)));
+  
+  /* Enhanced Shadows */
+  --shadow-brand: 0 4px 12px hsl(var(--chamego-dourado) / 0.15);
+  --shadow-elevated: 0 8px 24px hsl(0 0% 0% / 0.12);
+  
   /* Typography */
   --font-serif: 'Playfair Display', Georgia, serif;
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
