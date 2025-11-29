@@ -7,6 +7,7 @@ import { FunnelChart } from "@/components/admin/analytics/FunnelChart";
 import { ProductEngagementCard } from "@/components/admin/analytics/ProductEngagementCard";
 import { BehaviorAnalysisCard } from "@/components/admin/analytics/BehaviorAnalysisCard";
 import { AudienceInsightsCard } from "@/components/admin/analytics/AudienceInsightsCard";
+import { ActiveUsersCard } from "@/components/admin/analytics/ActiveUsersCard";
 
 export default function Analytics() {
   const [period, setPeriod] = useState(30);
@@ -29,7 +30,10 @@ export default function Analytics() {
         <BehaviorAnalysisCard days={period} />
       </div>
       
-      <AudienceInsightsCard days={period} />
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AudienceInsightsCard days={period} />
+        <ActiveUsersCard days={period} />
+      </div>
     </div>
   );
 }
