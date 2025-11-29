@@ -77,8 +77,6 @@ export function useClientes(filters?: {
   filterGroup?: FilterGroup;
   limit?: number;
   offset?: number;
-  orderBy?: string;
-  orderDirection?: 'asc' | 'desc';
 }) {
   return useQuery<{ data: ClienteCRM[]; count: number }>({
     queryKey: ['clientes', filters],
@@ -114,13 +112,6 @@ export function useClientes(filters?: {
       // Apply FilterGroup conditions
       if (filters?.filterGroup) {
         query = buildSupabaseConditions(query, filters.filterGroup);
-      }
-
-      // Apply ordering
-      if (filters?.orderBy) {
-        query = query.order(filters.orderBy, { 
-          ascending: filters.orderDirection === 'asc' 
-        });
       }
 
       if (filters?.limit) {

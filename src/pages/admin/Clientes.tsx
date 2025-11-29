@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useQueryClient } from '@tanstack/react-query';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Mail, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -82,10 +82,6 @@ export default function Clientes() {
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
   const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
 
-  // Sorting state
-  const [sortField, setSortField] = useState<string | null>(null);
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
   const createSegment = useCreateSegment();
   const updateSegment = useUpdateSegment();
   const blockClient = useBlockClient({
@@ -124,8 +120,6 @@ export default function Clientes() {
     filterGroup: currentFilters || undefined,
     limit,
     offset,
-    orderBy: sortField || undefined,
-    orderDirection: sortDirection,
   });
 
   const clientes = data?.data || [];
@@ -248,34 +242,6 @@ export default function Clientes() {
     setCampaignDialogOpen(true);
   };
 
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-    setPage(0); // Reset to first page when sorting changes
-  };
-
-  const SortableHeader = ({ field, label }: { field: string; label: string }) => (
-    <TableHead 
-      className="cursor-pointer hover:bg-muted/50 select-none transition-colors"
-      onClick={() => handleSort(field)}
-    >
-      <div className="flex items-center gap-1">
-        {label}
-        {sortField === field ? (
-          sortDirection === 'asc' ? 
-            <ArrowUp className="h-4 w-4" /> : 
-            <ArrowDown className="h-4 w-4" />
-        ) : (
-          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-        )}
-      </div>
-    </TableHead>
-  );
-
   const selectedClientsData = clientes.filter(c => 
     selectedClientIds.includes(c.id!)
   );
@@ -397,14 +363,14 @@ export default function Clientes() {
                   onCheckedChange={handleToggleAllClients}
                 />
               </TableHead>
-              <SortableHeader field="nome" label="Nome" />
-              <SortableHeader field="email" label="Email" />
-              <SortableHeader field="status" label="Status" />
+              <TableHead>Nome</TableHead>
+              <TableHead>Email</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Comunicações</TableHead>
               <TableHead>Tags</TableHead>
-              <SortableHeader field="dias_sem_comprar" label="Dias sem Comprar" />
-              <SortableHeader field="ticket_medio" label="Ticket Médio" />
-              <SortableHeader field="numero_pedidos" label="Pedidos" />
+              <TableHead>Dias sem Comprar</TableHead>
+              <TableHead>Ticket Médio</TableHead>
+              <TableHead>Pedidos</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
