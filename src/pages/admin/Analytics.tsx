@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AnalyticsHeader } from "@/components/admin/analytics/AnalyticsHeader";
 import { AnalyticsOverview } from "@/components/admin/analytics/AnalyticsOverview";
+import { AuthenticationChart } from "@/components/admin/analytics/AuthenticationChart";
 import { ActionableInsights } from "@/components/admin/analytics/ActionableInsights";
 import { TrafficSourcesChart } from "@/components/admin/analytics/TrafficSourcesChart";
 import { FunnelChart } from "@/components/admin/analytics/FunnelChart";
@@ -17,6 +18,8 @@ export default function Analytics() {
       <AnalyticsHeader period={period} onPeriodChange={setPeriod} />
       
       <AnalyticsOverview days={period} />
+      
+      <AuthenticationChart days={period} />
       
       <ActionableInsights days={period} />
       

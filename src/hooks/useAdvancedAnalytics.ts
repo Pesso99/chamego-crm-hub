@@ -607,3 +607,97 @@ export function usePeakHours(days: number = 30) {
     },
   });
 }
+
+export interface AuthenticationData {
+  date: string;
+  uniqueUsers: number;
+  sessions: number;
+}
+
+export interface AuthenticationTimeline {
+  daily: AuthenticationData[];
+  monthly: AuthenticationData[];
+  totals: {
+    totalUsers: number;
+    totalSessions: number;
+    avgDaily: number;
+  };
+}
+
+export function useAuthenticationTimeline(days: number = 30) {
+  return useQuery<AuthenticationTimeline>({
+    queryKey: ['authentication-timeline', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('viewed_at, user_id, session_id, is_authenticated')
+        .eq('is_authenticated', true)
+        .not('user_id', 'is', null)
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
+        .order('viewed_at', { ascending: true });
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      // Process daily data
+      const dailyMap = new Map<string, { users: Set<string>; sessions: Set<string> }>();
+      const monthlyMap = new Map<string, { users: Set<string>; sessions: Set<string> }>();
+
+      filtered.forEach((view: any) => {
+        const date = new Date(view.viewed_at);
+        const dayKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`; // YYYY-MM-01
+
+        // Daily aggregation
+        if (!dailyMap.has(dayKey)) {
+          dailyMap.set(dayKey, { users: new Set(), sessions: new Set() });
+        }
+        dailyMap.get(dayKey)!.users.add(view.user_id);
+        dailyMap.get(dayKey)!.sessions.add(view.session_id);
+
+        // Monthly aggregation
+        if (!monthlyMap.has(monthKey)) {
+          monthlyMap.set(monthKey, { users: new Set(), sessions: new Set() });
+        }
+        monthlyMap.get(monthKey)!.users.add(view.user_id);
+        monthlyMap.get(monthKey)!.sessions.add(view.session_id);
+      });
+
+      const daily: AuthenticationData[] = Array.from(dailyMap.entries())
+        .map(([date, data]) => ({
+          date,
+          uniqueUsers: data.users.size,
+          sessions: data.sessions.size,
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      const monthly: AuthenticationData[] = Array.from(monthlyMap.entries())
+        .map(([date, data]) => ({
+          date,
+          uniqueUsers: data.users.size,
+          sessions: data.sessions.size,
+        }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+
+      // Calculate totals
+      const allUsers = new Set(filtered.map((v: any) => v.user_id));
+      const allSessions = new Set(filtered.map((v: any) => v.session_id));
+      const avgDaily = daily.length > 0 
+        ? daily.reduce((sum, d) => sum + d.uniqueUsers, 0) / daily.length 
+        : 0;
+
+      return {
+        daily,
+        monthly,
+        totals: {
+          totalUsers: allUsers.size,
+          totalSessions: allSessions.size,
+          avgDaily,
+        },
+      };
+    },
+  });
+}
