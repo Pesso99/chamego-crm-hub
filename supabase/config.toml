@@ -1,1 +1,7 @@
-project_id = "zdngkdggpkamlaljjsid"
+project_id = "jhkpjlnwwysbunmhlcsf"
+
+[functions.send-campaign]
+verify_jwt = false
+
+[functions.sync-resend-templates]
+verify_jwt = false
