@@ -636,7 +636,10 @@ export interface AuthenticationTimeline {
 export function useAuthenticationTimeline(days: number = 30) {
   return useQuery<AuthenticationTimeline>({
     queryKey: ['authentication-timeline', days],
+    staleTime: 0, // Always revalidate to avoid serving stale cached data in analytics
     queryFn: async () => {
+      console.log('[AuthTimeline] Fetching authentication timeline for last days =', days);
+
       const { data, error } = await supabase
         .from('page_views')
         .select('viewed_at, user_id, session_id, is_authenticated')
@@ -645,14 +648,22 @@ export function useAuthenticationTimeline(days: number = 30) {
         .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
         .order('viewed_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('[AuthTimeline] Error fetching page_views:', error);
+        throw error;
+      }
+
+      console.log('[AuthTimeline] Raw auth events count:', data?.length ?? 0);
 
       const filtered = (data || []).filter((v: any) => 
         !EXCLUDED_USER_IDS.includes(v.user_id)
       );
 
+      console.log('[AuthTimeline] Filtered auth events (after excluded users):', filtered.length);
+
       // Get unique user IDs
       const userIds = [...new Set(filtered.map((v: any) => v.user_id))];
+      console.log('[AuthTimeline] Distinct userIds to load profiles for:', userIds.length);
 
       // Fetch user profiles
       const { data: profiles, error: profileError } = await supabase
@@ -660,7 +671,12 @@ export function useAuthenticationTimeline(days: number = 30) {
         .select('user_id, full_name, email, avatar_url')
         .in('user_id', userIds);
 
-      if (profileError) throw profileError;
+      if (profileError) {
+        console.error('[AuthTimeline] Failed to fetch profiles:', profileError);
+        throw profileError;
+      }
+
+      console.log('[AuthTimeline] Profiles fetched:', profiles?.length ?? 0);
 
       const profileMap = new Map(
         (profiles || []).map(p => [p.user_id, p])
