@@ -2,70 +2,33 @@ import { useState } from 'react';
 import { useClientes } from '@/hooks/useClientes';
 import { useBlockClient } from '@/hooks/useBlockClient';
 import { ClienteCRM, FilterGroup, Segment } from '@/types/crm.types';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useQueryClient } from '@tanstack/react-query';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
-import { Mail } from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ClientDrawer } from '@/components/admin/ClientDrawer';
-import { IntelligentFiltersPanel } from '@/components/admin/IntelligentFiltersPanel';
-import { SavedFiltersDropdown } from '@/components/admin/SavedFiltersDropdown';
-import { ManageFiltersModal } from '@/components/admin/ManageFiltersModal';
-import { ClientTagBadge } from '@/components/admin/ClientTagBadge';
-import { calculateClientTags } from '@/lib/crm/tagging';
 import { useCreateSegment, useUpdateSegment } from '@/hooks/useSegments';
-import { Save, MoreVertical, FolderOpen, Settings } from 'lucide-react';
 import { CreateCampaignDialog } from '@/components/admin/campaign-wizard/CreateCampaignDialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { toast } from 'sonner';
+import { ClientDrawer } from '@/components/admin/ClientDrawer';
+import { ManageFiltersModal } from '@/components/admin/ManageFiltersModal';
 import { SelectedFilters } from '@/lib/crm/filter-definitions';
-import { getFilterSummary } from '@/lib/crm/filter-query-builder';
+import { toast } from 'sonner';
+
+// New modular components
+import { ClientsHeader } from '@/components/admin/clients/ClientsHeader';
+import { ClientsFiltersCard } from '@/components/admin/clients/ClientsFiltersCard';
+import { ClientsSearchBar } from '@/components/admin/clients/ClientsSearchBar';
+import { ClientsTable } from '@/components/admin/clients/ClientsTable';
+import { ClientsBulkActions } from '@/components/admin/clients/ClientsBulkActions';
+import { ClientsPagination } from '@/components/admin/clients/ClientsPagination';
+import { SaveFilterDialog } from '@/components/admin/clients/SaveFilterDialog';
 
 export default function Clientes() {
   const queryClient = useQueryClient();
+  
+  // Search and filter state
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<string>('all');
   const [page, setPage] = useState(0);
-  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
   const [showBlocked, setShowBlocked] = useState(true);
   
-  // New intelligent filter state
+  // Intelligent filter state
   const [selectedFilters, setSelectedFilters] = useState<SelectedFilters>([]);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [currentFilters, setCurrentFilters] = useState<FilterGroup | null>(null);
@@ -77,6 +40,10 @@ export default function Clientes() {
   const [saveFilterDialogOpen, setSaveFilterDialogOpen] = useState(false);
   const [filterName, setFilterName] = useState('');
   const [filterDescription, setFilterDescription] = useState('');
+  
+  // Client drawer state
+  const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   
   // Manual selection state
   const [selectedClientIds, setSelectedClientIds] = useState<string[]>([]);
@@ -126,7 +93,6 @@ export default function Clientes() {
   const totalCount = data?.count || 0;
   const totalPages = Math.ceil(totalCount / limit);
 
-  // Filtrar clientes bloqueados no frontend
   const clientesFiltrados = clientes.filter(cliente => {
     if (!showBlocked && cliente.blocked_communications) {
       return false;
@@ -140,15 +106,6 @@ export default function Clientes() {
   const handleClientClick = (clientId: string) => {
     setSelectedClientId(clientId);
     setDrawerOpen(true);
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, any> = {
-      ativo: 'default',
-      inativo: 'destructive',
-      novo: 'success',
-    };
-    return colors[status?.toLowerCase()] || 'secondary';
   };
 
   const handleLoadFilter = (segment: Segment) => {
@@ -169,7 +126,6 @@ export default function Clientes() {
       toast.error('Adicione pelo menos um filtro para salvar');
       return;
     }
-    
     setSaveFilterDialogOpen(true);
   };
 
@@ -246,321 +202,83 @@ export default function Clientes() {
     selectedClientIds.includes(c.id!)
   );
 
+  const handleBlockClient = (userId: string, blocked: boolean) => {
+    blockClient.mutate({ userId, blocked });
+  };
+
   return (
     <div className="flex flex-col gap-6 p-8 min-h-screen">
-      {/* Top Section: Intelligent Filters */}
-      <Card className="shrink-0">
-        <CardHeader className="border-b">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-lg">📊 Filtros Inteligentes</CardTitle>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {hasActiveFilters && (
-                  <>
-                    <DropdownMenuItem onClick={handleSaveFilter}>
-                      <Save className="mr-2 h-4 w-4" />
-                      {selectedSegmentId ? 'Atualizar' : 'Salvar'} Filtros
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                  </>
-                )}
-                <DropdownMenuItem onClick={() => setManageFiltersOpen(true)}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  Gerenciar Filtros Salvos
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          <IntelligentFiltersPanel
-            selectedFilters={selectedFilters}
-            onSelectedFiltersChange={setSelectedFilters}
-            selectedTags={selectedTags}
-            onSelectedTagsChange={setSelectedTags}
-            onFiltersChange={setCurrentFilters}
-            onPreviewCount={setPreviewCount}
-          />
-        </CardContent>
-      </Card>
+      <ClientsHeader />
 
-      {/* Bottom Section: Client Table */}
+      <ClientsFiltersCard
+        selectedFilters={selectedFilters}
+        onSelectedFiltersChange={setSelectedFilters}
+        selectedTags={selectedTags}
+        onSelectedTagsChange={setSelectedTags}
+        onFiltersChange={setCurrentFilters}
+        onPreviewCount={setPreviewCount}
+        hasActiveFilters={hasActiveFilters}
+        onSave={handleSaveFilter}
+        onManage={() => setManageFiltersOpen(true)}
+        selectedSegmentId={selectedSegmentId}
+      />
+
       <div className="flex flex-col space-y-4">
-        {/* Search Bar + Saved Filters Dropdown */}
-        <div className="flex gap-4">
-          <Input
-            placeholder="🔍 Buscar por nome, e-mail..."
-            value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(0);
-            }}
-            className="flex-1"
-          />
+        <ClientsSearchBar
+          search={search}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setPage(0);
+          }}
+          status={status}
+          onStatusChange={setStatus}
+          onLoadFilter={handleLoadFilter}
+          onManageFilters={() => setManageFiltersOpen(true)}
+          displayedCount={displayedCount}
+          hasActiveFilters={hasActiveFilters}
+          showBlocked={showBlocked}
+          onToggleBlocked={() => setShowBlocked(!showBlocked)}
+          blockedCount={blockedCount}
+          onClearFilters={handleClearFilters}
+        />
 
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Status</SelectItem>
-              <SelectItem value="ativo">Ativo</SelectItem>
-              <SelectItem value="inativo">Inativo</SelectItem>
-              <SelectItem value="novo">Novo</SelectItem>
-            </SelectContent>
-          </Select>
+        <ClientsTable
+          clientes={clientesFiltrados}
+          isLoading={isLoading}
+          selectedIds={selectedClientIds}
+          onToggleSelection={handleToggleClientSelection}
+          onToggleAll={handleToggleAllClients}
+          onClientClick={handleClientClick}
+          onBlockClient={handleBlockClient}
+          hasActiveFilters={hasActiveFilters}
+        />
 
-          <SavedFiltersDropdown
-            onLoad={handleLoadFilter}
-            onManage={() => setManageFiltersOpen(true)}
-          />
-        </div>
-
-        {/* Preview Count */}
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
-            📋 {displayedCount} cliente{displayedCount !== 1 ? 's' : ''}
-            {hasActiveFilters && ' (filtrado)'}
-            {!showBlocked && blockedCount > 0 && ` • ${blockedCount} oculto(s)`}
-          </span>
-          
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setShowBlocked(!showBlocked)}
-            >
-              {showBlocked ? '🙈 Ocultar' : '👁️ Mostrar'} Bloqueados
-            </Button>
-            
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={handleClearFilters}>
-                Limpar Filtros
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Table */}
-        <Card className="flex flex-col min-h-[400px] max-h-[600px] overflow-hidden">
-          <div className="flex-1 overflow-y-auto">
-            <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-[50px]">
-                <Checkbox
-                  checked={
-                    selectedClientIds.length === clientesFiltrados.filter(c => c.id && !c.blocked_communications).length &&
-                    clientesFiltrados.length > 0 &&
-                    clientesFiltrados.filter(c => c.id && !c.blocked_communications).length > 0
-                  }
-                  onCheckedChange={handleToggleAllClients}
-                />
-              </TableHead>
-              <TableHead>Nome</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Comunicações</TableHead>
-              <TableHead>Tags</TableHead>
-              <TableHead>Dias sem Comprar</TableHead>
-              <TableHead>Ticket Médio</TableHead>
-              <TableHead>Pedidos</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <TableRow key={i}>
-                  {Array.from({ length: 8 }).map((_, j) => (
-                    <TableCell key={j}>
-                      <Skeleton className="h-4 w-full" />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : clientes.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    {hasActiveFilters
-                      ? 'Nenhum cliente encontrado com estes filtros'
-                      : 'Nenhum cliente encontrado'}
-                  </p>
-                </TableCell>
-              </TableRow>
-            ) : (
-              clientesFiltrados.map((cliente) => {
-                const tags = calculateClientTags(cliente);
-
-                return (
-                  <TableRow
-                    key={cliente.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleClientClick(cliente.id!)}
-                  >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedClientIds.includes(cliente.id!)}
-                        onCheckedChange={() => handleToggleClientSelection(cliente.id!)}
-                        disabled={cliente.blocked_communications}
-                      />
-                    </TableCell>
-                    <TableCell className="font-medium">{cliente.nome}</TableCell>
-                    <TableCell>{cliente.email}</TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusColor(cliente.status || '')}>
-                        {cliente.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <div className="flex items-center gap-2">
-                        {cliente.blocked_communications ? (
-                          <Badge variant="destructive" className="text-xs">
-                            🚫 Bloqueado
-                          </Badge>
-                        ) : (
-                          <Badge variant="default" className="text-xs">
-                            ✅ Ativo
-                          </Badge>
-                        )}
-                        
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              onClick={() => {
-                                blockClient.mutate({
-                                  userId: cliente.id!,
-                                  blocked: !cliente.blocked_communications
-                                });
-                              }}
-                            >
-                              {cliente.blocked_communications ? (
-                                <>✅ Remover da Blacklist</>
-                              ) : (
-                                <>🚫 Adicionar à Blacklist</>
-                              )}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-wrap gap-1 max-w-[300px]">
-                        {tags.slice(0, 3).map((tag) => (
-                          <ClientTagBadge key={tag.id} tag={tag} />
-                        ))}
-                        {tags.length > 3 && (
-                          <Badge variant="outline" className="text-xs">
-                            +{tags.length - 3}
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {cliente.dias_sem_comprar !== null && cliente.dias_sem_comprar !== undefined
-                        ? `${cliente.dias_sem_comprar} dias`
-                        : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {cliente.ticket_medio
-                        ? `R$ ${cliente.ticket_medio.toFixed(2)}`
-                        : '-'}
-                    </TableCell>
-                    <TableCell>{cliente.numero_pedidos || 0}</TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-            </Table>
-          </div>
-        </Card>
-
-        {/* Floating Action Bar */}
-        {selectedClientIds.length > 0 && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-            <Card className="shadow-lg border-2 border-primary">
-              <CardContent className="p-4 flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Badge variant="default" className="text-lg px-3 py-1">
-                    {selectedClientIds.length}
-                  </Badge>
-                  <span className="font-medium">
-                    cliente{selectedClientIds.length !== 1 ? 's' : ''} selecionado{selectedClientIds.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                
-                <Separator orientation="vertical" className="h-8" />
-                
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setSelectedClientIds([])}
-                  >
-                    Limpar Seleção
-                  </Button>
-                  <Button
-                    onClick={handleCreateCampaignWithSelected}
-                  >
-                    <Mail className="mr-2 h-4 w-4" />
-                    Enviar Comunicação
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between">
-            <Button
-              variant="outline"
-              onClick={() => setPage((p) => Math.max(0, p - 1))}
-              disabled={page === 0}
-            >
-              Anterior
-            </Button>
-            <span className="text-sm text-muted-foreground">
-              Página {page + 1} de {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-              disabled={page >= totalPages - 1}
-            >
-              Próxima
-            </Button>
-          </div>
-        )}
+        <ClientsPagination
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+        />
       </div>
 
-      {/* Client Drawer */}
+      <ClientsBulkActions
+        selectedCount={selectedClientIds.length}
+        onClear={() => setSelectedClientIds([])}
+        onCreateCampaign={handleCreateCampaignWithSelected}
+      />
+
+      {/* Modals */}
       <ClientDrawer
         clientId={selectedClientId}
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
       />
 
-      {/* Manage Filters Modal */}
       <ManageFiltersModal
         open={manageFiltersOpen}
         onOpenChange={setManageFiltersOpen}
         onEdit={handleEditFilter}
       />
 
-      {/* Campaign Dialog */}
       <CreateCampaignDialog
         open={campaignDialogOpen}
         onOpenChange={(open) => {
@@ -572,59 +290,17 @@ export default function Clientes() {
         preselectedClients={selectedClientsData}
       />
 
-      {/* Save Filter Dialog */}
-      <Dialog open={saveFilterDialogOpen} onOpenChange={setSaveFilterDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {selectedSegmentId ? 'Atualizar Filtro' : 'Salvar Filtro'}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedSegmentId
-                ? 'Atualize as informações do filtro salvo'
-                : 'Salve este conjunto de filtros para reutilização'}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="filter-name">Nome do Filtro</Label>
-              <Input
-                id="filter-name"
-                placeholder="Ex: Clientes VIP Inativos"
-                value={filterName}
-                onChange={(e) => setFilterName(e.target.value)}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="filter-description">Descrição (opcional)</Label>
-              <Textarea
-                id="filter-description"
-                placeholder="Descreva o objetivo deste filtro..."
-                value={filterDescription}
-                onChange={(e) => setFilterDescription(e.target.value)}
-                rows={3}
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setSaveFilterDialogOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleConfirmSaveFilter}
-              disabled={createSegment.isPending || updateSegment.isPending}
-            >
-              {selectedSegmentId ? 'Atualizar' : 'Salvar'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <SaveFilterDialog
+        open={saveFilterDialogOpen}
+        onOpenChange={setSaveFilterDialogOpen}
+        filterName={filterName}
+        onFilterNameChange={setFilterName}
+        filterDescription={filterDescription}
+        onFilterDescriptionChange={setFilterDescription}
+        onSave={handleConfirmSaveFilter}
+        isUpdate={!!selectedSegmentId}
+        isPending={createSegment.isPending || updateSegment.isPending}
+      />
     </div>
   );
 }
