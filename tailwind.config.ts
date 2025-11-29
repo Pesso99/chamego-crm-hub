@@ -57,6 +57,18 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        chamego: {
+          rosa: "hsl(var(--chamego-rosa))",
+          dourado: "hsl(var(--chamego-dourado))",
+          "rosa-hover": "hsl(var(--chamego-rosa-hover))",
+          "dourado-dark": "hsl(var(--chamego-dourado-dark))",
+        },
+        status: {
+          success: "hsl(var(--status-success))",
+          warning: "hsl(var(--status-warning))",
+          error: "hsl(var(--status-error))",
+          info: "hsl(var(--status-info))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
