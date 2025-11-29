@@ -12,6 +12,7 @@ import Clientes from "./pages/admin/Clientes";
 import Campanhas from "./pages/admin/Campanhas";
 import Templates from "./pages/admin/Templates";
 import Governanca from "./pages/admin/Governanca";
+import Analytics from "./pages/admin/Analytics";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
               <Route path="campanhas" element={<Campanhas />} />
               <Route path="templates" element={<Templates />} />
               <Route path="governanca" element={<Governanca />} />
+              <Route path="analytics" element={<Analytics />} />
             </Route>
           </Route>
           

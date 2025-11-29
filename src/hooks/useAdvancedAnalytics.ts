@@ -1,0 +1,434 @@
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+
+// Filtros para excluir admins
+const EXCLUDED_USER_IDS = [
+  '3acaa3c2-9cc5-4a12-9c26-360012dfbaf9',
+  'dd38f546-6478-443b-91a3-54b6d48ad0c1',
+  '3017bb09-f709-409f-b476-de90b4926e50'
+];
+
+export interface TrafficSource {
+  source: string;
+  count: number;
+  percentage: number;
+}
+
+export interface FunnelStep {
+  name: string;
+  path: string;
+  count: number;
+  percentage: number;
+}
+
+export interface HourlyData {
+  day: number;
+  hour: number;
+  count: number;
+}
+
+export interface UserJourney {
+  path: string;
+  count: number;
+  avgDuration: number;
+}
+
+export interface BounceRate {
+  page: string;
+  views: number;
+  bounces: number;
+  rate: number;
+}
+
+export interface ProductEngagement {
+  productName: string;
+  views: number;
+  avgDuration: number;
+}
+
+export interface GeographicData {
+  timezone: string;
+  count: number;
+}
+
+export interface SessionMetrics {
+  authenticated: number;
+  anonymous: number;
+  avgPagesPerSession: number;
+}
+
+export interface DeviceResolution {
+  resolution: string;
+  count: number;
+}
+
+export function useTrafficSources(days: number = 30) {
+  return useQuery<TrafficSource[]>({
+    queryKey: ['traffic-sources', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('referrer')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const sources = filtered.reduce((acc: Record<string, number>, view: any) => {
+        let source = 'Direto';
+        if (view.referrer) {
+          if (view.referrer.includes('instagram')) source = 'Instagram';
+          else if (view.referrer.includes('google')) source = 'Google';
+          else if (view.referrer.includes('facebook')) source = 'Facebook';
+          else source = 'Outros';
+        }
+        acc[source] = (acc[source] || 0) + 1;
+        return acc;
+      }, {});
+
+      const total = Object.values(sources).reduce((sum, count) => sum + count, 0);
+
+      return Object.entries(sources)
+        .map(([source, count]) => ({
+          source,
+          count,
+          percentage: Math.round((count / total) * 100)
+        }))
+        .sort((a, b) => b.count - a.count);
+    },
+  });
+}
+
+export function useConversionFunnel(days: number = 30) {
+  return useQuery<FunnelStep[]>({
+    queryKey: ['conversion-funnel', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('page_path, session_id')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const steps = [
+        { name: 'Home', path: '/', count: 0 },
+        { name: 'Produtos', path: '/produtos', count: 0 },
+        { name: 'Detalhe', path: '/produtos/', count: 0 },
+        { name: 'Carrinho', path: '/carrinho', count: 0 },
+        { name: 'Checkout', path: '/checkout', count: 0 },
+      ];
+
+      const sessions = new Map<string, Set<string>>();
+
+      filtered.forEach((view: any) => {
+        if (!sessions.has(view.session_id)) {
+          sessions.set(view.session_id, new Set());
+        }
+        sessions.get(view.session_id)!.add(view.page_path);
+      });
+
+      sessions.forEach((paths) => {
+        if (paths.has('/')) steps[0].count++;
+        if (paths.has('/produtos')) steps[1].count++;
+        if (Array.from(paths).some(p => p.startsWith('/produtos/') && p !== '/produtos')) steps[2].count++;
+        if (paths.has('/carrinho')) steps[3].count++;
+        if (paths.has('/checkout')) steps[4].count++;
+      });
+
+      const total = steps[0].count || 1;
+      return steps.map((step, idx) => ({
+        ...step,
+        percentage: idx === 0 ? 100 : Math.round((step.count / steps[0].count) * 100)
+      }));
+    },
+  });
+}
+
+export function useHourlyDistribution(days: number = 30) {
+  return useQuery<HourlyData[]>({
+    queryKey: ['hourly-distribution', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('viewed_at')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const heatmap: Record<string, number> = {};
+      
+      filtered.forEach((view: any) => {
+        const date = new Date(view.viewed_at);
+        const day = date.getDay();
+        const hour = date.getHours();
+        const key = `${day}-${hour}`;
+        heatmap[key] = (heatmap[key] || 0) + 1;
+      });
+
+      return Object.entries(heatmap).map(([key, count]) => {
+        const [day, hour] = key.split('-').map(Number);
+        return { day, hour, count };
+      });
+    },
+  });
+}
+
+export function useUserJourneys(days: number = 30) {
+  return useQuery<UserJourney[]>({
+    queryKey: ['user-journeys', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('page_path, session_id, duration_seconds, viewed_at')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
+        .order('viewed_at', { ascending: true });
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const sessions = new Map<string, Array<{ path: string; duration: number }>>();
+
+      filtered.forEach((view: any) => {
+        if (!sessions.has(view.session_id)) {
+          sessions.set(view.session_id, []);
+        }
+        sessions.get(view.session_id)!.push({
+          path: view.page_path,
+          duration: view.duration_seconds || 0
+        });
+      });
+
+      const journeys: Record<string, { count: number; totalDuration: number }> = {};
+
+      sessions.forEach((paths) => {
+        if (paths.length >= 2) {
+          const journey = paths.slice(0, 3).map(p => p.path).join(' → ');
+          const duration = paths.reduce((sum, p) => sum + p.duration, 0);
+          
+          if (!journeys[journey]) {
+            journeys[journey] = { count: 0, totalDuration: 0 };
+          }
+          journeys[journey].count++;
+          journeys[journey].totalDuration += duration;
+        }
+      });
+
+      return Object.entries(journeys)
+        .map(([path, data]) => ({
+          path,
+          count: data.count,
+          avgDuration: Math.round(data.totalDuration / data.count)
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    },
+  });
+}
+
+export function useBounceRates(days: number = 30) {
+  return useQuery<BounceRate[]>({
+    queryKey: ['bounce-rates', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('page_path, session_id')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const pageViews: Record<string, number> = {};
+      const sessionPages: Record<string, Set<string>> = {};
+
+      filtered.forEach((view: any) => {
+        pageViews[view.page_path] = (pageViews[view.page_path] || 0) + 1;
+        
+        if (!sessionPages[view.session_id]) {
+          sessionPages[view.session_id] = new Set();
+        }
+        sessionPages[view.session_id].add(view.page_path);
+      });
+
+      const bounces: Record<string, number> = {};
+      Object.values(sessionPages).forEach((pages) => {
+        if (pages.size === 1) {
+          const page = Array.from(pages)[0];
+          bounces[page] = (bounces[page] || 0) + 1;
+        }
+      });
+
+      return Object.entries(pageViews)
+        .map(([page, views]) => ({
+          page,
+          views,
+          bounces: bounces[page] || 0,
+          rate: Math.round(((bounces[page] || 0) / views) * 100)
+        }))
+        .filter(b => b.views >= 5)
+        .sort((a, b) => b.rate - a.rate)
+        .slice(0, 10);
+    },
+  });
+}
+
+export function useProductEngagement(days: number = 30) {
+  return useQuery<ProductEngagement[]>({
+    queryKey: ['product-engagement', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('page_path, page_title, duration_seconds')
+        .like('page_path', '/produtos/%')
+        .neq('page_path', '/produtos')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const products: Record<string, { count: number; totalDuration: number }> = {};
+
+      filtered.forEach((view: any) => {
+        const name = view.page_title || view.page_path.split('/').pop() || 'Unknown';
+        if (!products[name]) {
+          products[name] = { count: 0, totalDuration: 0 };
+        }
+        products[name].count++;
+        products[name].totalDuration += view.duration_seconds || 0;
+      });
+
+      return Object.entries(products)
+        .map(([productName, data]) => ({
+          productName,
+          views: data.count,
+          avgDuration: Math.round(data.totalDuration / data.count)
+        }))
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 10);
+    },
+  });
+}
+
+export function useGeographicData(days: number = 30) {
+  return useQuery<GeographicData[]>({
+    queryKey: ['geographic-data', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('metadata')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const timezones: Record<string, number> = {};
+
+      filtered.forEach((view: any) => {
+        const timezone = view.metadata?.timezone || 'Unknown';
+        timezones[timezone] = (timezones[timezone] || 0) + 1;
+      });
+
+      return Object.entries(timezones)
+        .map(([timezone, count]) => ({ timezone, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    },
+  });
+}
+
+export function useSessionMetrics(days: number = 30) {
+  return useQuery<SessionMetrics>({
+    queryKey: ['session-metrics', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('session_id, is_authenticated, page_path')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const sessions = new Map<string, { auth: boolean; pages: number }>();
+
+      filtered.forEach((view: any) => {
+        if (!sessions.has(view.session_id)) {
+          sessions.set(view.session_id, { auth: view.is_authenticated, pages: 0 });
+        }
+        sessions.get(view.session_id)!.pages++;
+      });
+
+      let authenticated = 0;
+      let anonymous = 0;
+      let totalPages = 0;
+
+      sessions.forEach((session) => {
+        if (session.auth) authenticated++;
+        else anonymous++;
+        totalPages += session.pages;
+      });
+
+      return {
+        authenticated,
+        anonymous,
+        avgPagesPerSession: Math.round(totalPages / sessions.size)
+      };
+    },
+  });
+}
+
+export function useDeviceResolutions(days: number = 30) {
+  return useQuery<DeviceResolution[]>({
+    queryKey: ['device-resolutions', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('screen_width, screen_height')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const resolutions: Record<string, number> = {};
+
+      filtered.forEach((view: any) => {
+        if (view.screen_width && view.screen_height) {
+          const resolution = `${view.screen_width}x${view.screen_height}`;
+          resolutions[resolution] = (resolutions[resolution] || 0) + 1;
+        }
+      });
+
+      return Object.entries(resolutions)
+        .map(([resolution, count]) => ({ resolution, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    },
+  });
+}

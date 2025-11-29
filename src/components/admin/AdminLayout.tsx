@@ -1,5 +1,5 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
-import { BarChart3, Users, Mail, FileText, Shield, Menu, LogOut, ChevronLeft } from "lucide-react";
+import { BarChart3, Users, Mail, FileText, Shield, Menu, LogOut, ChevronLeft, LineChart } from "lucide-react";
 import { useAuth, signOut } from "@/lib/auth";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -17,6 +17,7 @@ import {
 
 const navigation = [
   { name: "Dashboard", href: "/admin/dashboard", icon: BarChart3 },
+  { name: "Analytics", href: "/admin/analytics", icon: LineChart },
   { name: "Clientes", href: "/admin/clientes", icon: Users },
   { name: "Campanhas", href: "/admin/campanhas", icon: Mail },
   { name: "Templates", href: "/admin/templates", icon: FileText },
