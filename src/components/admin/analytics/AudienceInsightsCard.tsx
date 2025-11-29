@@ -1,8 +1,8 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Users, Monitor, Globe } from "lucide-react";
-import { useSessionMetrics, useGeographicData, useDeviceResolutions } from "@/hooks/useAdvancedAnalytics";
+import { Users, Monitor } from "lucide-react";
+import { useSessionMetrics, useDeviceCategories } from "@/hooks/useAdvancedAnalytics";
 
 interface AudienceInsightsCardProps {
   days: number;
@@ -10,10 +10,9 @@ interface AudienceInsightsCardProps {
 
 export function AudienceInsightsCard({ days }: AudienceInsightsCardProps) {
   const { data: sessionData, isLoading: loadingSession } = useSessionMetrics(days);
-  const { data: geoData, isLoading: loadingGeo } = useGeographicData(days);
-  const { data: deviceData, isLoading: loadingDevice } = useDeviceResolutions(days);
+  const { data: deviceData, isLoading: loadingDevice } = useDeviceCategories(days);
 
-  if (loadingSession || loadingGeo || loadingDevice) {
+  if (loadingSession || loadingDevice) {
     return (
       <Card>
         <CardHeader>
@@ -30,9 +29,6 @@ export function AudienceInsightsCard({ days }: AudienceInsightsCardProps) {
   const authPercent = total > 0 ? Math.round((sessionData!.authenticated / total) * 100) : 0;
   const anonPercent = 100 - authPercent;
 
-  const totalGeo = geoData?.reduce((sum, item) => sum + item.count, 0) || 1;
-  const totalDevice = deviceData?.reduce((sum, item) => sum + item.count, 0) || 1;
-
   return (
     <Card>
       <CardHeader>
@@ -41,18 +37,14 @@ export function AudienceInsightsCard({ days }: AudienceInsightsCardProps) {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="users">
               <Users className="h-4 w-4 mr-1" />
               Usuários
             </TabsTrigger>
             <TabsTrigger value="devices">
               <Monitor className="h-4 w-4 mr-1" />
-              Telas
-            </TabsTrigger>
-            <TabsTrigger value="geo">
-              <Globe className="h-4 w-4 mr-1" />
-              Local
+              Dispositivos
             </TabsTrigger>
           </TabsList>
 
@@ -89,43 +81,20 @@ export function AudienceInsightsCard({ days }: AudienceInsightsCardProps) {
           </TabsContent>
 
           <TabsContent value="devices" className="space-y-3">
-            {deviceData?.slice(0, 5).map((device, idx) => {
-              const percentage = Math.round((device.count / totalDevice) * 100);
-              return (
-                <div key={idx} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-mono text-xs text-foreground">{device.resolution}</span>
-                    <span className="text-muted-foreground">{percentage}%</span>
-                  </div>
-                  <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-chamego-dourado transition-all"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+            {deviceData?.map((device, idx) => (
+              <div key={idx} className="space-y-1">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-foreground">{device.category}</span>
+                  <span className="text-muted-foreground">{device.percentage}%</span>
                 </div>
-              );
-            })}
-          </TabsContent>
-
-          <TabsContent value="geo" className="space-y-3">
-            {geoData?.slice(0, 5).map((location, idx) => {
-              const percentage = Math.round((location.count / totalGeo) * 100);
-              return (
-                <div key={idx} className="space-y-1">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-foreground">{location.timezone}</span>
-                    <span className="text-muted-foreground">{percentage}%</span>
-                  </div>
-                  <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-blue-500 transition-all"
-                      style={{ width: `${percentage}%` }}
-                    />
-                  </div>
+                <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-chamego-dourado transition-all"
+                    style={{ width: `${device.percentage}%` }}
+                  />
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </TabsContent>
         </Tabs>
       </CardContent>

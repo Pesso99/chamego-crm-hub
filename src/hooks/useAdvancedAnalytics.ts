@@ -439,6 +439,135 @@ export interface PeakHours {
   count: number;
 }
 
+export interface ActiveUser {
+  userId: string;
+  name: string | null;
+  email: string;
+  avatarUrl: string | null;
+  totalViews: number;
+  sessions: number;
+  lastActivity: string;
+  avgDuration: number;
+}
+
+export interface DeviceCategory {
+  category: string;
+  count: number;
+  percentage: number;
+}
+
+export function useActiveUsers(days: number = 30) {
+  return useQuery<ActiveUser[]>({
+    queryKey: ['active-users', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('user_id, viewed_at, session_id, duration_seconds')
+        .not('user_id', 'is', null)
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      // Group by user_id
+      const userStats = new Map<string, {
+        views: number;
+        sessions: Set<string>;
+        lastActivity: string;
+        totalDuration: number;
+      }>();
+
+      filtered.forEach((view: any) => {
+        const userId = view.user_id;
+        if (!userStats.has(userId)) {
+          userStats.set(userId, {
+            views: 0,
+            sessions: new Set(),
+            lastActivity: view.viewed_at,
+            totalDuration: 0,
+          });
+        }
+        const stats = userStats.get(userId)!;
+        stats.views++;
+        stats.sessions.add(view.session_id);
+        stats.totalDuration += view.duration_seconds || 0;
+        if (new Date(view.viewed_at) > new Date(stats.lastActivity)) {
+          stats.lastActivity = view.viewed_at;
+        }
+      });
+
+      // Fetch profile data for all users
+      const userIds = Array.from(userStats.keys());
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email, avatar_url')
+        .in('user_id', userIds);
+
+      if (profileError) throw profileError;
+
+      const profileMap = new Map(
+        (profiles || []).map((p: any) => [p.user_id, p])
+      );
+
+      return Array.from(userStats.entries())
+        .map(([userId, stats]) => {
+          const profile = profileMap.get(userId);
+          return {
+            userId,
+            name: profile?.full_name || null,
+            email: profile?.email || 'unknown@email.com',
+            avatarUrl: profile?.avatar_url || null,
+            totalViews: stats.views,
+            sessions: stats.sessions.size,
+            lastActivity: stats.lastActivity,
+            avgDuration: Math.round(stats.totalDuration / stats.views),
+          };
+        })
+        .sort((a, b) => b.totalViews - a.totalViews);
+    },
+  });
+}
+
+export function useDeviceCategories(days: number = 30) {
+  return useQuery<DeviceCategory[]>({
+    queryKey: ['device-categories', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('screen_width')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const categories = { mobile: 0, tablet: 0, desktop: 0 };
+
+      filtered.forEach((view: any) => {
+        const width = view.screen_width;
+        if (!width) return;
+        
+        if (width < 768) categories.mobile++;
+        else if (width < 1024) categories.tablet++;
+        else categories.desktop++;
+      });
+
+      const total = categories.mobile + categories.tablet + categories.desktop;
+
+      return [
+        { category: 'Mobile', count: categories.mobile, percentage: Math.round((categories.mobile / total) * 100) },
+        { category: 'Tablet', count: categories.tablet, percentage: Math.round((categories.tablet / total) * 100) },
+        { category: 'Desktop', count: categories.desktop, percentage: Math.round((categories.desktop / total) * 100) },
+      ].filter(c => c.count > 0);
+    },
+  });
+}
+
 export function usePeakHours(days: number = 30) {
   return useQuery<PeakHours>({
     queryKey: ['peak-hours', days],
