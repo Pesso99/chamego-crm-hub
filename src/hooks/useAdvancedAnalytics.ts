@@ -432,3 +432,49 @@ export function useDeviceResolutions(days: number = 30) {
     },
   });
 }
+
+export interface PeakHours {
+  hour: number;
+  day: string;
+  count: number;
+}
+
+export function usePeakHours(days: number = 30) {
+  return useQuery<PeakHours>({
+    queryKey: ['peak-hours', days],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('page_views')
+        .select('viewed_at')
+        .gte('viewed_at', new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString());
+
+      if (error) throw error;
+
+      const filtered = (data || []).filter((v: any) => 
+        !v.user_id || !EXCLUDED_USER_IDS.includes(v.user_id)
+      );
+
+      const hourCounts: Record<number, number> = {};
+      const dayCounts: Record<number, number> = {};
+
+      filtered.forEach((view: any) => {
+        const date = new Date(view.viewed_at);
+        const hour = date.getHours();
+        const day = date.getDay();
+        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+        dayCounts[day] = (dayCounts[day] || 0) + 1;
+      });
+
+      const peakHour = Object.entries(hourCounts).sort(([,a], [,b]) => b - a)[0];
+      const peakDay = Object.entries(dayCounts).sort(([,a], [,b]) => b - a)[0];
+
+      const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+
+      return {
+        hour: parseInt(peakHour[0]),
+        day: dayNames[parseInt(peakDay[0])],
+        count: peakHour[1]
+      };
+    },
+  });
+}
