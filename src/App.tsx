@@ -2,14 +2,11 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Layout from "./components/Layout";
-import Dashboard from "./pages/Dashboard";
-import Customers from "./pages/Customers";
-import Campaigns from "./pages/Campaigns";
-import Segments from "./pages/Segments";
-import Tags from "./pages/Tags";
-import Settings from "./pages/Settings";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "@/contexts/AuthContext";
+import Login from "./pages/Login";
+import AdminLayout from "./components/AdminLayout";
+import Dashboard from "./pages/admin/Dashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -20,18 +17,23 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="customers" element={<Customers />} />
-            <Route path="campaigns" element={<Campaigns />} />
-            <Route path="segments" element={<Segments />} />
-            <Route path="tags" element={<Tags />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Navigate to="/admin/dashboard" replace />} />
+            <Route path="/login" element={<Login />} />
+            
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<Navigate to="dashboard" replace />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="clientes" element={<div className="p-8">Clientes - Em desenvolvimento</div>} />
+              <Route path="campanhas" element={<div className="p-8">Campanhas - Em desenvolvimento</div>} />
+              <Route path="templates" element={<div className="p-8">Templates - Em desenvolvimento</div>} />
+              <Route path="governanca" element={<div className="p-8">Governança - Em desenvolvimento</div>} />
+            </Route>
+            
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
