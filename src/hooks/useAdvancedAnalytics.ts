@@ -608,10 +608,19 @@ export function usePeakHours(days: number = 30) {
   });
 }
 
+export interface AuthenticationUserDetail {
+  userId: string;
+  name: string | null;
+  email: string;
+  avatarUrl: string | null;
+  pageViews: number;
+}
+
 export interface AuthenticationData {
   date: string;
   uniqueUsers: number;
   sessions: number;
+  users: AuthenticationUserDetail[];
 }
 
 export interface AuthenticationTimeline {
@@ -642,45 +651,101 @@ export function useAuthenticationTimeline(days: number = 30) {
         !EXCLUDED_USER_IDS.includes(v.user_id)
       );
 
-      // Process daily data
-      const dailyMap = new Map<string, { users: Set<string>; sessions: Set<string> }>();
-      const monthlyMap = new Map<string, { users: Set<string>; sessions: Set<string> }>();
+      // Get unique user IDs
+      const userIds = [...new Set(filtered.map((v: any) => v.user_id))];
+
+      // Fetch user profiles
+      const { data: profiles, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, full_name, email, avatar_url')
+        .in('user_id', userIds);
+
+      if (profileError) throw profileError;
+
+      const profileMap = new Map(
+        (profiles || []).map(p => [p.user_id, p])
+      );
+
+      // Process daily and monthly data with user details
+      const dailyMap = new Map<string, { 
+        users: Set<string>; 
+        sessions: Set<string>;
+        userDetails: Map<string, number>;
+      }>();
+      const monthlyMap = new Map<string, { 
+        users: Set<string>; 
+        sessions: Set<string>;
+        userDetails: Map<string, number>;
+      }>();
 
       filtered.forEach((view: any) => {
         const date = new Date(view.viewed_at);
-        const dayKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
-        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`; // YYYY-MM-01
+        const dayKey = date.toISOString().split('T')[0];
+        const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
 
         // Daily aggregation
         if (!dailyMap.has(dayKey)) {
-          dailyMap.set(dayKey, { users: new Set(), sessions: new Set() });
+          dailyMap.set(dayKey, { 
+            users: new Set(), 
+            sessions: new Set(),
+            userDetails: new Map()
+          });
         }
-        dailyMap.get(dayKey)!.users.add(view.user_id);
-        dailyMap.get(dayKey)!.sessions.add(view.session_id);
+        const dailyData = dailyMap.get(dayKey)!;
+        dailyData.users.add(view.user_id);
+        dailyData.sessions.add(view.session_id);
+        dailyData.userDetails.set(
+          view.user_id, 
+          (dailyData.userDetails.get(view.user_id) || 0) + 1
+        );
 
         // Monthly aggregation
         if (!monthlyMap.has(monthKey)) {
-          monthlyMap.set(monthKey, { users: new Set(), sessions: new Set() });
+          monthlyMap.set(monthKey, { 
+            users: new Set(), 
+            sessions: new Set(),
+            userDetails: new Map()
+          });
         }
-        monthlyMap.get(monthKey)!.users.add(view.user_id);
-        monthlyMap.get(monthKey)!.sessions.add(view.session_id);
+        const monthlyData = monthlyMap.get(monthKey)!;
+        monthlyData.users.add(view.user_id);
+        monthlyData.sessions.add(view.session_id);
+        monthlyData.userDetails.set(
+          view.user_id, 
+          (monthlyData.userDetails.get(view.user_id) || 0) + 1
+        );
       });
 
-      const daily: AuthenticationData[] = Array.from(dailyMap.entries())
-        .map(([date, data]) => ({
-          date,
-          uniqueUsers: data.users.size,
-          sessions: data.sessions.size,
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date));
+      const buildAuthData = (
+        dateMap: Map<string, { users: Set<string>; sessions: Set<string>; userDetails: Map<string, number> }>
+      ): AuthenticationData[] => {
+        return Array.from(dateMap.entries())
+          .map(([date, data]) => {
+            const users: AuthenticationUserDetail[] = Array.from(data.userDetails.entries())
+              .map(([userId, pageViews]) => {
+                const profile = profileMap.get(userId);
+                return {
+                  userId,
+                  name: profile?.full_name || null,
+                  email: profile?.email || 'unknown@email.com',
+                  avatarUrl: profile?.avatar_url || null,
+                  pageViews,
+                };
+              })
+              .sort((a, b) => b.pageViews - a.pageViews);
 
-      const monthly: AuthenticationData[] = Array.from(monthlyMap.entries())
-        .map(([date, data]) => ({
-          date,
-          uniqueUsers: data.users.size,
-          sessions: data.sessions.size,
-        }))
-        .sort((a, b) => a.date.localeCompare(b.date));
+            return {
+              date,
+              uniqueUsers: data.users.size,
+              sessions: data.sessions.size,
+              users,
+            };
+          })
+          .sort((a, b) => a.date.localeCompare(b.date));
+      };
+
+      const daily = buildAuthData(dailyMap);
+      const monthly = buildAuthData(monthlyMap);
 
       // Calculate totals
       const allUsers = new Set(filtered.map((v: any) => v.user_id));
