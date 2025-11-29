@@ -7,6 +7,8 @@ import { useEffect } from 'react';
 import { Users } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { buildQueryFromSelectedFilters } from '@/lib/crm/filter-query-builder';
+import { ClientsPreviewList } from '../ClientsPreviewList';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface CampaignAudienceStepProps {
   flow: any;
@@ -60,8 +62,8 @@ export function CampaignAudienceStep({ flow }: CampaignAudienceStepProps) {
       </div>
 
       {hasPreselectedClients ? (
-        <Card className="p-4 bg-primary/5 border-primary/20">
-          <div className="space-y-3">
+        <Card className="p-4 bg-primary/5 border-primary/20 space-y-4">
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Users className="h-5 w-5 text-primary" />
               <div>
@@ -83,9 +85,17 @@ export function CampaignAudienceStep({ flow }: CampaignAudienceStepProps) {
                 isManualSelection: false
               })}
             >
-              Limpar Seleção e Usar Filtros
+              Limpar Seleção
             </Button>
           </div>
+
+          <ScrollArea className="max-h-[300px]">
+            <ClientsPreviewList
+              clients={data.selectedClients}
+              maxVisible={10}
+              showViewAll={false}
+            />
+          </ScrollArea>
         </Card>
       ) : (
         <>
